@@ -252,7 +252,7 @@ final class Publish extends ProtocolBase implements ReadableContentInterface, Wr
         if (\strlen($rawMQTTHeaders) === 1) {
             $this->logger->debug('Only one incoming byte, retrieving rest of size and the full payload');
             $restOfBytes = $client->readBrokerData(1);
-            $payload = $client->readBrokerData(\ord($restOfBytes));
+            $payload = $client->readBrokerData(10000);
         } else {
             $this->logger->debug('More than 1 byte detected, calculating and retrieving the rest');
             $restOfBytes = $rawMQTTHeaders{1};
@@ -285,26 +285,31 @@ final class Publish extends ProtocolBase implements ReadableContentInterface, Wr
 
         // TopicFilter size is always the 3rd byte
         $firstByte = \ord($rawMQTTHeaders{0});
-        $topicSize = \ord($rawMQTTHeaders{3});
-        $qosLevel = $this->determineIncomingQoSLevel($firstByte);
+        $topicByteIndex = 3;
+		$topicSize      = \ord( $rawMQTTHeaders{$topicByteIndex} );
+		if ( $topicSize == 0 ) {
+			$topicByteIndex = 4;
+			$topicSize      = \ord( $rawMQTTHeaders{$topicByteIndex} );
+		}
+		$qosLevel = $this->determineIncomingQoSLevel( $firstByte );
 
-        $messageStartPosition = 4;
-        if ($qosLevel->getQoSLevel() > 0) {
-            $this->logger->debug('QoS level above 0, shifting message start position and getting packet identifier');
-            // [2 (fixed header) + 2 (topic size) + $topicSize] marks the beginning of the 2 packet identifier bytes
-            $this->setPacketIdentifier(new PacketIdentifier(Utilities::convertBinaryStringToNumber(
-                $rawMQTTHeaders{4 + $topicSize} . $rawMQTTHeaders{5 + $topicSize}
-            )));
-            $this->logger->debug('Determined packet identifier', ['PI' => $this->getPacketIdentifier()]);
-            $messageStartPosition += 2;
-        }
+		$messageStartPosition = $topicByteIndex + 1;
+		if ( $qosLevel->getQoSLevel() > 0 ) {
+			$this->logger->debug( 'QoS level above 0, shifting message start position and getting packet identifier' );
+			// [2 (fixed header) + 2 (topic size) + $topicSize] marks the beginning of the 2 packet identifier bytes
+			$this->setPacketIdentifier( new PacketIdentifier( Utilities::convertBinaryStringToNumber(
+				$rawMQTTHeaders{$messageStartPosition + $topicSize} . $rawMQTTHeaders{$messageStartPosition + 1 + $topicSize}
+			) ) );
+			$this->logger->debug( 'Determined packet identifier', [ 'PI' => $this->getPacketIdentifier() ] );
+			$messageStartPosition += 2;
+		}
 
-        // At this point $rawMQTTHeaders will be always 1 byte long, initialize a Message object with dummy data for now
-        $this->message = new Message(
-            // Save to assume a constant here: first 2 bytes will always be fixed header, next 2 bytes are topic size
-            substr($rawMQTTHeaders, $messageStartPosition + $topicSize),
-            new TopicName(substr($rawMQTTHeaders, 4, $topicSize))
-        );
+		// At this point $rawMQTTHeaders will be always 1 byte long, initialize a Message object with dummy data for now
+		$this->message = new Message(
+		// Save to assume a constant here: first 2 bytes will always be fixed header, next 2 bytes are topic size
+			substr( $rawMQTTHeaders, $messageStartPosition + $topicSize ),
+			new TopicName( substr( $rawMQTTHeaders, $topicByteIndex + 1, $topicSize ) )
+		);
         $this->analyzeFirstByte($firstByte, $qosLevel);
 
         $this->logger->debug('Determined headers', [

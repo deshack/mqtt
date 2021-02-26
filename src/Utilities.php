@@ -58,6 +58,6 @@ final class Utilities
      */
     public static function convertBinaryStringToNumber(string $binaryString): int
     {
-        return self::convertEndianness((\ord($binaryString{1}) << 8) + (\ord($binaryString{0}) & 255));
+        return self::convertEndianness((\ord($binaryString[1]) << 8) + (\ord($binaryString[0]) & 255));
     }
 }

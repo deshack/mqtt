@@ -255,11 +255,11 @@ final class Publish extends ProtocolBase implements ReadableContentInterface, Wr
             $payload = $client->readBrokerData(10000);
         } else {
             $this->logger->debug('More than 1 byte detected, calculating and retrieving the rest');
-            $restOfBytes = $rawMQTTHeaders{1};
+            $restOfBytes = $rawMQTTHeaders[1];
             $payload = substr($rawMQTTHeaders, 2);
             $exactRest = \ord($restOfBytes) - \strlen($payload);
             $payload .= $client->readBrokerData($exactRest);
-            $rawMQTTHeaders = $rawMQTTHeaders{0};
+            $rawMQTTHeaders = $rawMQTTHeaders[0];
         }
 
         // $rawMQTTHeaders may be redefined
@@ -284,12 +284,12 @@ final class Publish extends ProtocolBase implements ReadableContentInterface, Wr
         #$this->logger->debug('Bin data', [\unreal4u\MQTT\DebugTools::convertToBinaryRepresentation($rawMQTTHeaders)]);
 
         // TopicFilter size is always the 3rd byte
-        $firstByte = \ord($rawMQTTHeaders{0});
+        $firstByte = \ord($rawMQTTHeaders[0] );
         $topicByteIndex = 3;
-		$topicSize      = \ord( $rawMQTTHeaders{$topicByteIndex} );
+		$topicSize      = \ord( $rawMQTTHeaders[ $topicByteIndex ] );
 		if ( $topicSize == 0 ) {
 			$topicByteIndex = 4;
-			$topicSize      = \ord( $rawMQTTHeaders{$topicByteIndex} );
+			$topicSize      = \ord( $rawMQTTHeaders[ $topicByteIndex ] );
 		}
 		$qosLevel = $this->determineIncomingQoSLevel( $firstByte );
 
@@ -298,7 +298,7 @@ final class Publish extends ProtocolBase implements ReadableContentInterface, Wr
 			$this->logger->debug( 'QoS level above 0, shifting message start position and getting packet identifier' );
 			// [2 (fixed header) + 2 (topic size) + $topicSize] marks the beginning of the 2 packet identifier bytes
 			$this->setPacketIdentifier( new PacketIdentifier( Utilities::convertBinaryStringToNumber(
-				$rawMQTTHeaders{$messageStartPosition + $topicSize} . $rawMQTTHeaders{$messageStartPosition + 1 + $topicSize}
+                $rawMQTTHeaders[ $messageStartPosition + $topicSize ] . $rawMQTTHeaders[ $messageStartPosition + 1 + $topicSize ]
 			) ) );
 			$this->logger->debug( 'Determined packet identifier', [ 'PI' => $this->getPacketIdentifier() ] );
 			$messageStartPosition += 2;
